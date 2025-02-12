@@ -1,24 +1,28 @@
 """
 Azure Function App to check the expiry of SSL certificates for a list of URLs.
 """
-# noinspection PyPackageRequirements
-import azure.functions as func
 from datetime import datetime, timezone
 import logging
 import os
 import ssl
+# noinspection PyPackageRequirements
+import azure.functions as func
+import cryptography.exceptions
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-import requests
-from requests.auth import HTTPBasicAuth
+import requests  # type:ignore[import-untyped]
+from requests.auth import HTTPBasicAuth  # type:ignore[import-untyped]
 
 
 app = func.FunctionApp()
 load_dotenv()
 
+frequency = os.getenv('CRON_FREQUENCY')  # type:ignore[arg-type]  # Get the frequency from environment variable
 
+
+# pylint: disable=too-few-public-methods
 class Email:
     """
     Email object
@@ -44,6 +48,12 @@ class Email:
 
         :return: None
         """
+        if not os.getenv('WEBHOOK_URL'):  # If the webhook URL is not set
+            raise ValueError('WEBHOOK_URL not set')  # Exit if the webhook URL is not set
+
+        if not os.getenv('WEBHOOK_USER') or not os.getenv('WEBHOOK_PASS'):  # If the webhook user or password is not set
+            raise ValueError('WEBHOOK_USER or WEBHOOK_PASS not set')  # Exit if the webhook user or password is not set
+
         basic = HTTPBasicAuth(os.getenv('WEBHOOK_USER'), os.getenv('WEBHOOK_PASS'))  # Basic auth for webhook
 
         try:  # Try to send the email
@@ -55,38 +65,51 @@ class Email:
                     "to": self.to,  # recipient(s)
                     "sender": self.sender  # sender
                 },
-                auth=basic  # Basic auth for webhook
+                auth=basic,  # Basic auth for webhook
+                timeout=30  # Timeout for the request
             )
 
-        except Exception as e:  # Handle exceptions
-            logging.error(f'Error: {e}')  # Log the error
+        except requests.exceptions.RequestException as e:  # Handle exceptions
+            logging.error('Error: %s', e)  # Log the error
             raise  # Exit if there is an error
 
         if response.status_code != 201:  # If the response status code is not 201
-            logging.error(f'Error {response.status_code}: {response.text}')  # Log the error
+            logging.error('Error %s: %s', response.status_code, response.text)  # Log the error
+            raise requests.exceptions.RequestException()  # Exit if there is an error
 
 
 # noinspection PyUnusedLocal, PyTypeChecker, PyUnresolvedReferences
-@app.timer_trigger(schedule=os.getenv('CRON_FREQUENCY'), arg_name="mytimer", run_on_startup=False, use_monitor=False)
-def ssl_expiry_checker(mytimer: func.TimerRequest) -> None:
+@app.timer_trigger(
+    schedule=frequency, arg_name="mytimer", run_on_startup=False, use_monitor=False)  # type:ignore[arg-type]
+def ssl_expiry_checker(mytimer: func.TimerRequest) -> None:  # pylint: disable=unused-argument
     """
     Check the expiry of SSL certificates for a list of URLs.
     :param mytimer:
     :return:
     """
+    if not os.getenv('EXPIRY_THRESHOLD'):  # If the certificate expires in less than X days
+        raise ValueError('EXPIRY_THRESHOLD not set')  # Exit if the expiry threshold is not set
+
     certs = get_certificates(get_urls())  # Get the certificates for the list of URLs
 
     expiring = []  # List to hold expiring certificates
 
     for cert in certs:  # Loop through the certificates
+        if not os.getenv('EXPIRY_THRESHOLD'):
+            raise ValueError('EXPIRY_THRESHOLD not set')  # Exit if the expiry threshold is not set
 
         data = check_expiry(cert.encode())  # Check the expiry of the certificate
+
+        if not isinstance(data['expires'], datetime):  # If the certificate has no expiration date
+            cert_name = data['cn'] if data['cn'] else 'Unknown'  # Get the certificate name
+            raise ValueError(f'Certificate {cert_name} has no expiration date')  # Exit if no date
+
         delta = data['expires'] - datetime.now(timezone.utc)  # Get the expiration datetime delta
-        days = delta.days  # Get the number of days until expiry
+        days = delta.days if delta.days else 90  # Get the number of days until expiry
 
-        if days < int(os.getenv('EXPIRY_THRESHOLD')):  # If the certificate expires in less than X days
+        if days < int(os.getenv('EXPIRY_THRESHOLD')):  # type:ignore[arg-type]  # If the cert expires < X days
 
-            logging.info(f'Certificate {data["cn"]} expires in {days} days')  # Log the certificate expiry
+            logging.info('Certificate %s expires %s in days', data["cn"], days)  # Log the certificate expiry
             expiring.append(  # Add the certificate to the list of expiring certificates
                 {
                     'cert': data['cn'],
@@ -102,11 +125,11 @@ def ssl_expiry_checker(mytimer: func.TimerRequest) -> None:
 
         try:  # Try to send the email
             email.send()  # Send the email
-        except Exception as e:  # Handle exceptions
-            logging.error(f'Error sending email: {e}')  # Log the error if there is an error sending the email
+        except (requests.exceptions.RequestException, ValueError) as e:  # Handle exceptions
+            logging.error('Error sending email: %s', e)  # Log the error if there is an error sending the email
             raise  # Exit if there is an error sending the email
 
-        logging.info(f'Email sent to {email.to}')  # Log if the email is sent
+        logging.info('Email sent to %s', email.to)  # Log if the email is sent
         return  # Exit if there are expiring certificates
 
     logging.info('No expiring certificates')  # Log if there are no expiring certificates
@@ -117,7 +140,7 @@ def get_urls() -> list:
     Get the list of URLs from environment variable
     :return: list of URLs
     """
-    return os.getenv('DOMAINS').split(',')  # Get the list of URLs from the environment variable
+    return os.getenv('DOMAINS').split(',')  # type:ignore[union-attr]  # Get list of URLs
 
 
 def get_certificates(urls: list) -> list:
@@ -133,8 +156,8 @@ def get_certificates(urls: list) -> list:
         try:  # Try to get the certificate
             cert = ssl.get_server_certificate((url, 443))  # Get the certificate
 
-        except Exception as e:  # Handle exceptions
-            logging.error(f'Error getting certificate for {url}: {e}')  # Log the error
+        except cryptography.exceptions.InternalError as e:  # Handle exceptions
+            logging.error('Error getting certificate for %s: %s', url, e)  # Log the error
             continue  # Skip if there is an error
 
         if cert not in certs:  # If the certificate is not already in the list
@@ -144,7 +167,7 @@ def get_certificates(urls: list) -> list:
 
 
 # noinspection PyUnresolvedReferences
-def check_expiry(cryptography_cert_pem: x509) -> dict[str, str]:
+def check_expiry(cryptography_cert_pem: bytes) -> dict[str, str | datetime]:
     """
     Check the expiry of the certificate.
 
@@ -161,7 +184,7 @@ def check_expiry(cryptography_cert_pem: x509) -> dict[str, str]:
         ExtensionOID.SUBJECT_ALTERNATIVE_NAME
     )
 
-    domains = ext.value.get_values_for_type(x509.DNSName)  # Get the subject alternative names
+    domains = ext.value.get_values_for_type(x509.DNSName)  # type: ignore # Get the subject alternative names
 
     cert_dict = {  # Create the output dictionary
         'cn': cn,
@@ -179,6 +202,14 @@ def construct_email(expiring) -> Email:
     :param expiring:
     :return: Email object
     """
+    if not os.getenv('EMAIL_SUBJECT'):
+        raise ValueError('EMAIL_SUBJECT not set')  # Exit if the email subject is not set
+
+    if not os.getenv('EMAIL_TO'):
+        raise ValueError('EMAIL_TO not set')  # Exit if the email to is not set
+
+    if not os.getenv('EMAIL_SENDER'):
+        raise ValueError('EMAIL_SENDER not set')  # Exit if the email sender is not set
 
     body = render_template(  # Build the email body
         'email.html',  # template
@@ -186,10 +217,10 @@ def construct_email(expiring) -> Email:
     )
 
     email = Email(  # Create the email object
-        subject=os.getenv('EMAIL_SUBJECT'),  # subject
+        subject=os.getenv('EMAIL_SUBJECT'),  # type:ignore[arg-type]  # subject
         body=body,  # body
-        to=os.getenv('EMAIL_TO'),  # recipient(s)
-        sender=os.getenv('EMAIL_SENDER'),  # sender
+        to=os.getenv('EMAIL_TO'),  # type:ignore[arg-type]  # recipient(s)
+        sender=os.getenv('EMAIL_SENDER'),  # type:ignore[arg-type]  # sender
     )
 
     return email
