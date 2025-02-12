@@ -1,0 +1,25 @@
+{% block content %}
+    <strong>SSL Certificate Expiry Notification</strong>
+    <table style="text-align: left; border-collapse: collapse; width: 100%">
+        <thead style="vertical-align: top; border-top: 1px solid #000">
+            <tr style="padding: 5px; border-top: 1px solid #000; border-bottom: 1px solid #000">
+                <th scope="col" style="padding: 5px">Certificate Name</th>
+                <th scope="col" style="padding: 5px">Domain(s)</th>
+                <th scope="col" style="padding: 5px">Days Remaining</th>
+            </tr>
+        </thead>
+        <tbody style="vertical-align: top">
+            {% for cert in expiring %}
+            <tr style="padding: 5px; text-align: left; border-bottom: 1px solid #333">
+                <th scope="row" style="padding: 5px">{{ cert.cert }}</th>
+                <td style="padding: 5px">
+                    {% for domain in cert.domains %}
+                        {{ domain }}{% if not loop.last %}<br />{% endif %}
+                    {% endfor %}
+                </td>
+                <td style="padding: 5px">{{ cert.delta }} (Expires: {{ cert.expires.strftime('%Y-%m-%d') }})</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
