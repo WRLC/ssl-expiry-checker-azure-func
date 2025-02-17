@@ -12,6 +12,8 @@ from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+import mysql.connector
+from mysql.connector import errorcode
 import requests  # type:ignore[import-untyped]
 from requests.auth import HTTPBasicAuth  # type:ignore[import-untyped]
 
@@ -140,7 +142,39 @@ def get_urls() -> list:
     Get the list of URLs from environment variable
     :return: list of URLs
     """
-    return os.getenv('DOMAINS').split(',')  # type:ignore[union-attr]  # Get list of URLs
+    try:
+        conn = mysql.connector.connect(  # Connect to the database
+            host=os.getenv('DB_HOST'),  # type:ignore[arg-type]  # Database host
+            user=os.getenv('DB_USER'),  # type:ignore[arg-type]  # Database user
+            password=os.getenv('DB_PASS'),  # type:ignore[arg-type]  # Database password
+            database=os.getenv('DB_NAME'),  # type:ignore[arg-type]  # Database name
+        )
+    except mysql.connector.Error as err:  # Handle exceptions
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:  # If the error is access denied
+            logging.error('Something is wrong with your user name or password')  # Log the error
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:  # If the error is bad database
+            logging.error('Database does not exist')  # Log the error
+        else:  # If the error is something else
+            logging.error('Error connecting to database: %s', err)  # Log the error
+        raise  # Exit if there is an error connecting to the database
+
+    cursor = conn.cursor()  # Create a cursor
+
+    cursor.execute(  # Get one domain for each certificate
+        "SELECT certificate.Name AS Certificate, MIN(domain.Domain) as Domain from domain "
+        "JOIN certificate on certificate.Certid = domain.Certid "
+        "WHERE domain.Domain NOT LIKE '*.%' AND certificate.Public = TRUE "
+        "GROUP BY certificate.Name;"
+    )
+
+    rows = cursor.fetchall()  # Fetch the results
+
+    cursor.close()  # Close the cursor
+    conn.close()  # Close the connection
+
+    urls = [row[1] for row in rows]  # type:ignore[index]  # Get the list of URLs
+
+    return urls  # Return the list of URLs
 
 
 def get_certificates(urls: list) -> list:
@@ -154,6 +188,7 @@ def get_certificates(urls: list) -> list:
     for url in urls:  # Loop through the URLs
 
         try:  # Try to get the certificate
+            logging.info('Getting certificate for %s', url)  # Log the URL
             cert = ssl.get_server_certificate((url, 443))  # Get the certificate
 
         except cryptography.exceptions.InternalError as e:  # Handle exceptions
