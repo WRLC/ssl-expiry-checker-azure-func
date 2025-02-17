@@ -21,6 +21,9 @@ from requests.auth import HTTPBasicAuth  # type:ignore[import-untyped]
 app = func.FunctionApp()
 load_dotenv()
 
+if not os.getenv('CRON_FREQUENCY'):  # If the cron frequency is not set
+    raise ValueError('CRON_FREQUENCY not set')  # raise ValueError
+
 frequency = os.getenv('CRON_FREQUENCY')  # type:ignore[arg-type]  # Get the frequency from environment variable
 
 
@@ -142,6 +145,18 @@ def get_urls() -> list:
     Get the list of URLs from environment variable
     :return: list of URLs
     """
+    if not os.getenv('DB_HOST'):  # If db host is not set
+        raise ValueError('DB_HOST not set')  # raise ValueError
+
+    if not os.getenv('DB_USER'):  # If the db user is not set
+        raise ValueError('DB_USER not set')  # raise ValueError
+
+    if not os.getenv('DB_PASS'):  # If db password is not set
+        raise ValueError('DB_PASS not set')  # raise ValueError
+
+    if not os.getenv('DB_NAME'):  # If db name is not set
+        raise ValueError('DB_NAME not set')  # raise ValueError
+
     try:
         conn = mysql.connector.connect(  # Connect to the database
             host=os.getenv('DB_HOST'),  # type:ignore[arg-type]  # Database host
@@ -156,6 +171,9 @@ def get_urls() -> list:
             logging.error('Database does not exist')  # Log the error
         else:  # If the error is something else
             logging.error('Error connecting to database: %s', err)  # Log the error
+        raise
+    except Exception as e:  # Handle any other type of exception
+        logging.error('Error connecting to database: %s', e)  # Log the error
         raise  # Exit if there is an error connecting to the database
 
     cursor = conn.cursor()  # Create a cursor
