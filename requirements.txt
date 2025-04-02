@@ -7,7 +7,7 @@ charset-normalizer==3.4.1
 click==8.1.8
 cryptography==44.0.2
 dill==0.3.9
-flake8==7.1.2
+flake8==7.2.0
 Flask==3.1.0
 idna==3.10
 isort==6.0.1
@@ -19,9 +19,9 @@ mypy==1.15.0
 mypy-extensions==1.0.0
 mysql-connector-python==9.2.0
 platformdirs==4.3.6
-pycodestyle==2.12.1
+pycodestyle==2.13.0
 pycparser==2.22
-pyflakes==3.2.0
+pyflakes==3.3.2
 pylint==3.3.4
 pyOpenSSL==25.0.0
 python-dotenv==1.0.1
