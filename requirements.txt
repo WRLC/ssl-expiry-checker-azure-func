@@ -1,4 +1,4 @@
-astroid==3.3.9
+astroid==3.3.10
 azure-functions==1.22.1
 blinker==1.9.0
 certifi==2025.1.31
@@ -8,7 +8,7 @@ click==8.1.8
 cryptography==44.0.2
 dill==0.3.9
 flake8==7.2.0
-Flask==3.1.1
+Flask==3.1.0
 idna==3.10
 isort==6.0.1
 itsdangerous==2.2.0
