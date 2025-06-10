@@ -14,18 +14,21 @@ files = [
 
 [[package]]
 name = "azure-functions"
-version = "1.22.1"
-description = "Azure Functions for Python"
+version = "1.23.0"
+description = "Python library for Azure Functions."
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "azure-functions-1.22.1.tar.gz", hash = "sha256:235bb2a4e83d911a0bf4db3eec8f072ce6a0d2c2662bf8bc6d1bbe9389f10562"},
-    {file = "azure_functions-1.22.1-py3-none-any.whl", hash = "sha256:ae4e68bb734365ae74bb2f55bd04f33b8a3d83c0e079a394a4c26b378f7b5f6a"},
+    {file = "azure_functions-1.23.0-py3-none-any.whl", hash = "sha256:d2307c179a293f19b5d64ce9adbd79dc1c26161af86dc60119ade6646ddccdf2"},
+    {file = "azure_functions-1.23.0.tar.gz", hash = "sha256:30a12ffeac36ccd681c6510d2b97cc94c4980476e99ef123a39e232ad5d4666a"},
 ]
 
+[package.dependencies]
+werkzeug = {version = ">=3.1.3,<3.2.0", markers = "python_version >= \"3.9\""}
+
 [package.extras]
-dev = ["azure-functions-durable", "coverage", "flake8 (>=4.0.1,<4.1.0)", "flake8-logging-format", "mypy", "pytest", "pytest-cov", "requests (==2.*)"]
+dev = ["azure-functions-durable", "coverage", "flake8 (>=4.0.1,<4.1.0) ; python_version < \"3.11\"", "flake8 (>=7.1.1,<7.2.0) ; python_version >= \"3.11\"", "pre-commit", "pytest", "pytest-cov", "pytest-instafail"]
 
 [[package]]
 name = "certifi"
@@ -746,6 +749,24 @@ brotli = ["brotli (>=1.0.9) ; platform_python_implementation == \"CPython\"", "b
 h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "werkzeug"
+version = "3.1.3"
+description = "The comprehensive WSGI web application library."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},
+    {file = "werkzeug-3.1.3.tar.gz", hash = "sha256:60723ce945c19328679790e3282cc758aa4a6040e4bb330f53d30fa546d44746"},
+]
+
+[package.dependencies]
+MarkupSafe = ">=2.1.1"
+
+[package.extras]
+watchdog = ["watchdog (>=2.3)"]
 
 [metadata]
 lock-version = "2.1"
